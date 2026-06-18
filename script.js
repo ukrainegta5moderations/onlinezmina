@@ -10,23 +10,11 @@ let currentMod = null;
 let isOnShift = false;
 let shiftStartTimeRaw = null;
 
-document.addEventListener("DOMContentLoaded", async () => {
-    await loadProfilesDropdown();
+document.addEventListener("DOMContentLoaded", () => {
     checkAuth();
 });
 
 // Завантаження списку користувачів
-async function loadProfilesDropdown() {
-    const { data, error } = await db.from('moderators').select('name').order('name');
-    const select = document.getElementById('profile-select');
-    if (!error && data) {
-        select.innerHTML = '<option value="">-- Оберіть свій нікнейм --</option>';
-        data.forEach(mod => {
-            select.innerHTML += `<option value="${mod.name}">${mod.name}</option>`;
-        });
-    }
-}
-
 function checkAuth() {
     const savedUser = localStorage.getItem('active_ug_user');
     if (savedUser) {
@@ -37,11 +25,44 @@ function checkAuth() {
     }
 }
 
-async function loginAsSelected() {
-    const selectedName = document.getElementById('profile-select').value;
-    if (!selectedName) return alert("Будь ласка, оберіть нікнейм!");
-    localStorage.setItem('active_ug_user', selectedName);
-    loadUserDashboard(selectedName);
+async function loginUser() {
+    const username = document.getElementById('login-username').value.trim();
+    const password = document.getElementById('login-password').value.trim();
+
+    if (!username || !password) {
+        return alert("Будь ласка, введіть нікнейм та пароль!");
+    }
+
+    // Шукаємо модератора в базі за нікнеймом
+    const { data, error } = await db.from('moderators').select('*').eq('name', username).single();
+
+    if (error || !data) {
+        return alert("Такого модератора не знайдено! Перевірте правильність вводу або зверніться до Адміністратора.");
+    }
+
+    // Якщо пароль ще не встановлено (це перший вхід модератора)
+    if (!data.password) {
+        const confirmMsg = confirm(`Це ваш перший вхід. Встановити введений пароль як ваш постійний?`);
+        if (confirmMsg) {
+            // Зберігаємо пароль у базу
+            await db.from('moderators').update({ password: password }).eq('name', username);
+            alert("Пароль успішно створено! Ви увійшли в систему.");
+            
+            // Зберігаємо сесію і пускаємо в панель
+            localStorage.setItem('active_ug_user', username);
+            loadUserDashboard(username);
+        }
+        return;
+    }
+
+    // Якщо пароль вже встановлено раніше, перевіряємо його
+    if (data.password !== password) {
+        return alert("Невірний пароль!");
+    }
+
+    // Якщо пароль правильний — пускаємо в панель
+    localStorage.setItem('active_ug_user', username);
+    loadUserDashboard(username);
 }
 
 function logout() {
@@ -196,7 +217,6 @@ async function addNewModerator() {
     document.getElementById('new-mod-email').value = "";
     
     await loadAdminModsList();
-    await loadProfilesDropdown();
 }
 
 async function openEditStatModal(name) {
