@@ -6,10 +6,25 @@
     <title>Панель Модератора | Ukraine GTA</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
-    <div class="dashboard">
+    <div id="login-overlay" class="auth-overlay">
+        <div class="modal-window">
+            <h2>Вхід у панель модерації</h2>
+            <div class="form-group">
+                <label>Оберіть свій профіль:</label>
+                <select id="profile-select">
+                    <option value="">Завантаження списку...</option>
+                </select>
+            </div>
+            <button class="action-submit-btn" onclick="loginAsSelected()">Увійти</button>
+            <button class="action-submit-btn" style="background: transparent; border: 1px solid #ef4444; color: #ef4444; margin-top: 10px;" onclick="openAdminPanel()">🔐 Адмін-панель</button>
+        </div>
+    </div>
+
+    <div class="dashboard" id="main-dashboard" style="display: none;">
         <div class="profile-header">
             <div class="profile-info">
                 <div class="avatar-container">
@@ -21,53 +36,23 @@
                     <p class="role" id="user-role">Завантаження...</p>
                 </div>
             </div>
-            <button class="logout-btn" onclick="alert('Модуль авторизації буде підключено пізніше!')">
-                <i class="fa-solid fa-right-from-bracket"></i> Вийти
+            <button class="logout-btn" onclick="logout()">
+                <i class="fa-solid fa-right-from-bracket"></i> Змінити акаунт
             </button>
         </div>
 
-        <div class="section-title">Статистика <span class="sub-title">(Локальні дані)</span></div>
+        <div class="section-title">Статистика <span class="sub-title">(Дані з бази синхронізовано)</span></div>
         <div class="stats-grid">
-            <div class="stat-card line-red">
-                <h3>Кількість доган</h3>
-                <div class="stat-value" id="stat-reprimands">0/3</div>
-            </div>
-            <div class="stat-card line-yellow">
-                <h3>Кількість попереджень</h3>
-                <div class="stat-value" id="stat-warnings">0/2</div>
-            </div>
-            <div class="stat-card line-green">
-                <h3>Кількість змін</h3>
-                <div class="stat-value" id="stat-shifts">0</div>
-            </div>
-            <div class="stat-card line-blue">
-                <h3>Кількість покарань</h3>
-                <div class="stat-value" id="stat-punishments">28</div>
-            </div>
-            <div class="stat-card line-purple">
-                <h3>Кількість попереджень з грошима</h3>
-                <div class="stat-value" id="stat-money-warnings">17</div>
-            </div>
-            <div class="stat-card line-pink">
-                <h3>К-сть відповідей у "тех.підтримку"</h3>
-                <div class="stat-value" id="stat-support-replies">117</div>
-            </div>
-            <div class="stat-card line-orange">
-                <h3>Кількість премій</h3>
-                <div class="stat-value" id="stat-bonuses">10%</div>
-            </div>
-            <div class="stat-card line-cyan">
-                <h3>Кількість штрафів</h3>
-                <div class="stat-value" id="stat-fines">0%</div>
-            </div>
-            <div class="stat-card line-teal">
-                <h3>К-сть днів неактивів</h3>
-                <div class="stat-value" id="stat-inactive-days">0 Days</div>
-            </div>
-            <div class="stat-card line-indigo">
-                <h3>Середній онлайн за тиждень</h3>
-                <div class="stat-value" id="stat-weekly-online">0 год. 0 хв.</div>
-            </div>
+            <div class="stat-card line-red"><h3>Кількість доган</h3><div class="stat-value" id="stat-reprimands">0/3</div></div>
+            <div class="stat-card line-yellow"><h3>Кількість попереджень</h3><div class="stat-value" id="stat-warnings">0/2</div></div>
+            <div class="stat-card line-green"><h3>Кількість змін</h3><div class="stat-value" id="stat-shifts">0</div></div>
+            <div class="stat-card line-blue"><h3>Кількість покарань</h3><div class="stat-value" id="stat-punishments">0</div></div>
+            <div class="stat-card line-purple"><h3>Кількість попереджень з $</h3><div class="stat-value" id="stat-money-warnings">0</div></div>
+            <div class="stat-card line-pink"><h3>К-сть відповідей в ТП</h3><div class="stat-value" id="stat-support-replies">0</div></div>
+            <div class="stat-card line-orange"><h3>Кількість премій</h3><div class="stat-value" id="stat-bonuses">0%</div></div>
+            <div class="stat-card line-cyan"><h3>Кількість штрафів</h3><div class="stat-value" id="stat-fines">0%</div></div>
+            <div class="stat-card line-teal"><h3>К-сть днів неактивів</h3><div class="stat-value" id="stat-inactive-days">0 Days</div></div>
+            <div class="stat-card line-indigo"><h3>Онлайн за тиждень</h3><div class="stat-value" id="stat-weekly-online">0 год.</div></div>
         </div>
 
         <div class="section-title" style="margin-top: 15px;">ОБЕРІТЬ ДІЮ</div>
@@ -75,27 +60,14 @@
             <button class="control-btn main-action" id="shift-btn" onclick="openShiftModal()">
                 <div class="btn-icon-wrapper blue-icon"><i class="fa-solid fa-play" id="shift-icon"></i></div>
                 <div class="btn-title" id="shift-btn-title">Почати зміну</div>
-                <div class="btn-desc">Зафіксувати початок робочого часу</div>
             </button>
             <button class="control-btn" onclick="openModal('history-modal')">
                 <div class="btn-icon-wrapper blue-icon"><i class="fa-solid fa-clock"></i></div>
                 <div class="btn-title">Історія змін</div>
-                <div class="btn-desc">Переглянути попередні зміни</div>
             </button>
-            <button class="control-btn" onclick="alert('Модуль відпусток у розробці!')">
-                <div class="btn-icon-wrapper blue-icon"><i class="fa-solid fa-umbrella-beach"></i></div>
-                <div class="btn-title">Відпустка/Неактив</div>
-                <div class="btn-desc">Оформити відпустку або неактив</div>
-            </button>
-            <button class="control-btn" onclick="alert('Модуль лідерборду у розробці!')">
-                <div class="btn-icon-wrapper blue-icon"><i class="fa-solid fa-trophy"></i></div>
-                <div class="btn-title">Лідерборд</div>
-                <div class="btn-desc">Рейтинг найактивніших модераторів</div>
-            </button>
-            <button class="control-btn" onclick="openSettingsModal()">
-                <div class="btn-icon-wrapper blue-icon"><i class="fa-solid fa-user-gear"></i></div>
-                <div class="btn-title">Налаштування</div>
-                <div class="btn-desc">Змінити особисті дані</div>
+            <button class="control-btn admin-only-btn" onclick="openAdminPanel()">
+                <div class="btn-icon-wrapper blue-icon" style="color: #ef4444 !important; background: rgba(239,68,68,0.15) !important;"><i class="fa-solid fa-lock"></i></div>
+                <div class="btn-title" style="color: #fca5a5;">Адмін-панель</div>
             </button>
         </div>
     </div>
@@ -110,61 +82,73 @@
                 <span class="close-btn" onclick="closeModal('shift-modal')">&times;</span>
             </div>
             <div class="form-group">
-                <label id="shift-time-label">Час початку зміни (Київський час):</label>
+                <label id="shift-time-label">Час (Київ):</label>
                 <input type="time" id="shift-custom-time">
             </div>
-            <button class="action-submit-btn" id="shift-submit-btn" onclick="confirmShiftAction()">Підтвердити старт</button>
+            <button class="action-submit-btn" id="shift-submit-btn" onclick="confirmShiftAction()">Підтвердити</button>
         </div>
     </div>
 
     <div class="modal-overlay" id="history-modal" onclick="closeModalOnOverlay(event, 'history-modal')">
-        <div class="modal-window">
+        <div class="modal-window" style="max-width: 650px;">
             <div class="modal-header">
-                <div class="modal-title-wrapper">
-                    <div class="modal-icon-circle"><i class="fa-solid fa-clock"></i></div>
-                    <h2>Історія змін</h2>
-                </div>
+                <h2>Ваша історія змін</h2>
                 <span class="close-btn" onclick="closeModal('history-modal')">&times;</span>
             </div>
             <div class="history-container">
                 <table class="modal-table">
-                    <thead>
-                        <tr>
-                            <th>ДАТА</th>
-                            <th>ПОЧАТОК</th>
-                            <th>КІНЕЦЬ</th>
-                            <th>ТРИВАЛІСТЬ</th>
-                        </tr>
-                    </thead>
-                    <tbody id="history-table-body">
-                        </tbody>
+                    <thead><tr><th>ДАТА</th><th>ПОЧАТОК</th><th>КІНЕЦЬ</th><th>ТРИВАЛІСТЬ</th></tr></thead>
+                    <tbody id="history-table-body"></tbody>
                 </table>
             </div>
         </div>
     </div>
 
-    <div class="modal-overlay" id="settings-modal" onclick="closeModalOnOverlay(event, 'settings-modal')">
-        <div class="modal-window">
+    <div class="modal-overlay" id="admin-modal" onclick="closeModalOnOverlay(event, 'admin-modal')">
+        <div class="modal-window" style="max-width: 900px; max-height: 85vh; overflow-y: auto;">
             <div class="modal-header">
-                <div class="modal-title-wrapper">
-                    <div class="modal-icon-circle"><i class="fa-solid fa-user-gear"></i></div>
-                    <h2>Налаштування профілю</h2>
+                <h2>Панель Старшого Адміністратора</h2>
+                <span class="close-btn" onclick="closeModal('admin-modal')">&times;</span>
+            </div>
+            
+            <div style="margin-bottom: 20px; padding: 10px; background: rgba(255,255,255,0.02); border-radius: 8px;">
+                <h3>Додати нового модератора в базу</h3>
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                    <input type="text" id="new-mod-name" placeholder="Ім'я модератора" style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 8px; border-radius: 6px; flex: 1;">
+                    <input type="email" id="new-mod-email" placeholder="Email" style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 8px; border-radius: 6px; flex: 1;">
+                    <button class="action-submit-btn" onclick="addNewModerator()" style="margin:0; width: auto; padding: 8px 15px;">Створити</button>
                 </div>
-                <span class="close-btn" onclick="closeModal('settings-modal')">&times;</span>
             </div>
-            <div class="form-group">
-                <label>Ім'я (Нікнейм):</label>
-                <input type="text" id="input-username" placeholder="Наприклад: Danil Perets">
+
+            <h3>Список команди та редагування статистики</h3>
+            <div class="history-container" style="margin-top: 10px;">
+                <table class="modal-table">
+                    <thead><tr><th>Модератор</th><th>Догани</th><th>Попередж.</th><th>Покарання</th><th>Штрафи</th><th>Дії</th></tr></thead>
+                    <tbody id="admin-mods-list"></tbody>
+                </table>
             </div>
-            <div class="form-group">
-                <label>Електронна пошта:</label>
-                <input type="email" id="input-email" placeholder="Введіть ваш email">
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="edit-stat-modal" onclick="closeModalOnOverlay(event, 'edit-stat-modal')">
+        <div class="modal-window" style="max-width: 450px;">
+            <div class="modal-header">
+                <h2 id="edit-mod-title">Редагування статистики</h2>
+                <span class="close-btn" onclick="closeModal('edit-stat-modal')">&times;</span>
             </div>
-            <div class="form-group">
-                <label>Посада:</label>
-                <input type="text" id="input-role" placeholder="Наприклад: Модератор Discord">
+            <input type="hidden" id="edit-mod-name-hidden">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; text-align: left;">
+                <div class="form-group"><label>Догани:</label><input type="text" id="edit-reprimands"></div>
+                <div class="form-group"><label>Попередження:</label><input type="text" id="edit-warnings"></div>
+                <div class="form-group"><label>Покарання:</label><input type="number" id="edit-punishments"></div>
+                <div class="form-group"><label>Попередження з $:</label><input type="number" id="edit-money-warnings"></div>
+                <div class="form-group"><label>Відповіді в ТП:</label><input type="number" id="edit-support-replies"></div>
+                <div class="form-group"><label>Премії:</label><input type="text" id="edit-bonuses"></div>
+                <div class="form-group"><label>Штрафи:</label><input type="text" id="edit-fines"></div>
+                <div class="form-group"><label>Дні неактивів:</label><input type="text" id="edit-inactive-days"></div>
+                <div class="form-group" style="grid-column: span 2;"><label>Онлайн за тиждень:</label><input type="text" id="edit-weekly-online"></div>
             </div>
-            <button class="action-submit-btn" onclick="saveSettings()">Зберегти зміни</button>
+            <button class="action-submit-btn" onclick="submitAdminChanges()">Зберегти зміни в базу</button>
         </div>
     </div>
 
