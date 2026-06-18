@@ -1,212 +1,231 @@
 // ================= НАЛАШТУВАННЯ SUPABASE =================
-const SUPABASE_URL = "https://mntxteqzxwcbquqbnjax.supabase.co/rest/v1/";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1udHh0ZXF6eHdjYnF1cWJuamF4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MDQ1MTQsImV4cCI6MjA5NzM4MDUxNH0._mht0QadAB4MKgx8c6ZLgd4VMPW0tfZSVJ3Q93XKHjU";
-const ADMIN_PASSWORD = "1234"; // Пароль для входу в адмін-панель
+const SUPABASE_URL = "https://mntxteqzxwcbquqbnjax.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_rcVqAcRtU8CrZOyuhO6sdA_xySK7sdp"; // <-- Встав ключ сюди!
+const ADMIN_PASSWORD = "1234"; // Пароль для адмінки
 
-const supabase = Supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // =========================================================
-// ================= НАЛАШТУВАННЯ ДАНИХ ПРОФІЛЮ (ДИНАМІЧНО З БРАУЗЕРА) =================
-let MODERATOR_NAME = localStorage.getItem('ug_mod_name') || "Новий Модератор";
-let MODERATOR_EMAIL = localStorage.getItem('ug_mod_email') || "email@не_вказано";
-let MODERATOR_ROLE = localStorage.getItem('ug_mod_role') || "Модератор Discord";
 
-let isOnShift = false; 
-let shiftStartTimeRaw = null; 
+let currentMod = null;
+let isOnShift = false;
+let shiftStartTimeRaw = null;
 
-// Завантажуємо історію змін з пам'яті браузера (LocalStorage)
-let shiftsHistory = JSON.parse(localStorage.getItem('ug_shifts_history')) || [];
-
-// Ініціалізація після завантаження сторінки
-document.addEventListener("DOMContentLoaded", () => {
-    // Відновлюємо стан активної зміни, якщо користувач оновив сторінку
-    const savedShiftState = localStorage.getItem('ug_current_shift');
-    if (savedShiftState) {
-        isOnShift = true;
-        shiftStartTimeRaw = savedShiftState;
-        updateShiftUI(true);
-    }
-
-    renderHistoryTable();
-    renderProfile();
+document.addEventListener("DOMContentLoaded", async () => {
+    await loadProfilesDropdown();
+    checkAuth();
 });
 
-// Збереження виконаної зміни локально
-function saveShiftToLocalStorage(date, start, end, duration) {
-    const newShift = {
-        id: Date.now(),
-        date: date,
-        start: start,
-        end: end,
-        duration: duration
-    };
-    
-    shiftsHistory.unshift(newShift); // Додаємо на початок списку
-    localStorage.setItem('ug_shifts_history', JSON.stringify(shiftsHistory));
-    
-    renderHistoryTable();
-    renderProfile();
-}
-
-// Заповнення таблиці історії
-function renderHistoryTable() {
-    let tableBody = document.getElementById("history-table-body");
-    if (tableBody) {
-        tableBody.innerHTML = ""; 
-
-        if (shiftsHistory.length === 0) {
-            tableBody.innerHTML = `<tr><td colspan="4" style="text-align:center; color: #64748b;">Історія змін порожня</td></tr>`;
-            return;
-        }
-
-        shiftsHistory.forEach(shift => {
-            const row = document.createElement("tr");
-            row.innerHTML = `
-                <td>${shift.date}</td>
-                <td>${shift.start}</td>
-                <td>${shift.end}</td>
-                <td><span class="status-badge active">${shift.duration}</span></td>
-            `;
-            tableBody.appendChild(row);
+// Завантаження списку користувачів
+async function loadProfilesDropdown() {
+    const { data, error } = await db.from('moderators').select('name').order('name');
+    const select = document.getElementById('profile-select');
+    if (!error && data) {
+        select.innerHTML = '<option value="">-- Оберіть свій нікнейм --</option>';
+        data.forEach(mod => {
+            select.innerHTML += `<option value="${mod.name}">${mod.name}</option>`;
         });
     }
 }
 
-// Оновлення полів профілю та картки кількості змін
-function renderProfile() {
-    const nameEl = document.getElementById("user-name");
-    const roleEl = document.getElementById("user-role");
-    const avatarEl = document.querySelector(".avatar");
-    const shiftCountEl = document.getElementById("stat-shifts");
-    
-    if (nameEl) nameEl.innerText = MODERATOR_NAME;
-    if (roleEl) roleEl.innerText = `${MODERATOR_ROLE} • ${MODERATOR_EMAIL}`;
-    
-    // Автоматична генерація аватара за першими літерами імені
-    if (avatarEl) {
-        avatarEl.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(MODERATOR_NAME)}&background=0D8ABC&color=fff&bold=true`;
+function checkAuth() {
+    const savedUser = localStorage.getItem('active_ug_user');
+    if (savedUser) {
+        loadUserDashboard(savedUser);
+    } else {
+        document.getElementById('login-overlay').style.display = 'flex';
+        document.getElementById('main-dashboard').style.display = 'none';
     }
-    
-    // Відображаємо кількість проведених змін у картці статистики
-    if (shiftCountEl) shiftCountEl.innerText = `${shiftsHistory.length}`;
 }
 
-// ================= КЕРУВАННЯ МОДАЛЬНИМИ ВІКНАМИ =================
+async function loginAsSelected() {
+    const selectedName = document.getElementById('profile-select').value;
+    if (!selectedName) return alert("Будь ласка, оберіть нікнейм!");
+    localStorage.setItem('active_ug_user', selectedName);
+    loadUserDashboard(selectedName);
+}
+
+function logout() {
+    localStorage.removeItem('active_ug_user');
+    location.reload();
+}
+
+async function loadUserDashboard(name) {
+    document.getElementById('login-overlay').style.display = 'none';
+    document.getElementById('main-dashboard').style.display = 'block';
+
+    const { data, error } = await db.from('moderators').select('*').eq('name', name).single();
+    if (!error && data) {
+        currentMod = data;
+        renderDashboardUI();
+        loadUserShiftsHistory();
+    }
+}
+
+function renderDashboardUI() {
+    document.getElementById("user-name").innerText = currentMod.name;
+    document.getElementById("user-role").innerText = `${currentMod.role} • ${currentMod.email || 'Немає пошти'}`;
+    document.querySelector(".avatar").src = `https://ui-avatars.com/api/?name=${encodeURIComponent(currentMod.name)}&background=0D8ABC&color=fff&bold=true`;
+
+    document.getElementById("stat-reprimands").innerText = currentMod.reprimands;
+    document.getElementById("stat-warnings").innerText = currentMod.warnings;
+    document.getElementById("stat-punishments").innerText = currentMod.punishments;
+    document.getElementById("stat-money-warnings").innerText = currentMod.money_warnings;
+    document.getElementById("stat-support-replies").innerText = currentMod.support_replies;
+    document.getElementById("stat-bonuses").innerText = currentMod.bonuses;
+    document.getElementById("stat-fines").innerText = currentMod.fines;
+    document.getElementById("stat-inactive-days").innerText = currentMod.inactive_days;
+    document.getElementById("stat-weekly-online").innerText = currentMod.weekly_online;
+
+    const savedShiftState = localStorage.getItem(`ug_shift_${currentMod.name}`);
+    if (savedShiftState) {
+        isOnShift = true;
+        shiftStartTimeRaw = savedShiftState;
+        updateShiftUI(true);
+    } else {
+        isOnShift = false;
+        updateShiftUI(false);
+    }
+}
+
+async function loadUserShiftsHistory() {
+    const { data, error } = await db.from('shifts').select('*').eq('moderator_name', currentMod.name).order('timestamp', { ascending: false });
+    const tableBody = document.getElementById("history-table-body");
+    
+    if (!error && data) {
+        document.getElementById("stat-shifts").innerText = data.length;
+        tableBody.innerHTML = data.length === 0 ? '<tr><td colspan="4" style="text-align:center;">Історія порожня</td></tr>' : '';
+        data.forEach(shift => {
+            tableBody.innerHTML += `<tr><td>${shift.date}</td><td>${shift.start_time}</td><td>${shift.end_time}</td><td><span class="status-badge active">${shift.duration}</span></td></tr>`;
+        });
+    }
+}
+
+// КЕРУВАННЯ ВІКНАМИ
 function openModal(id) { document.getElementById(id)?.classList.add('open'); }
 function closeModal(id) { document.getElementById(id)?.classList.remove('open'); }
 function closeModalOnOverlay(event, id) { if (event.target.id === id) closeModal(id); }
 
-// Відкриття модалки зміни
 function openShiftModal() {
-    const modalTitle = document.getElementById('shift-modal-title');
-    const modalIcon = document.getElementById('shift-modal-icon');
-    const timeLabel = document.getElementById('shift-time-label');
-    const submitBtn = document.getElementById('shift-submit-btn');
-    const timeInput = document.getElementById('shift-custom-time');
-
-    const options = { timeZone: 'Europe/Kyiv', hour: '2-digit', minute: '2-digit', hour12: false };
-    const kyivTimeStr = new Date().toLocaleString('uk-UA', options);
-    
-    if (timeInput) timeInput.value = kyivTimeStr;
-
-    if (!isOnShift) {
-        if (modalTitle) modalTitle.innerText = "Відкриття робочої зміни";
-        if (modalIcon) modalIcon.className = "fa-solid fa-play";
-        if (timeLabel) timeLabel.innerText = "Час початку зміни (Київ):";
-        if (submitBtn) submitBtn.innerText = "Підтвердити старт";
-    } else {
-        if (modalTitle) modalTitle.innerText = "Завершення робочої зміни";
-        if (modalIcon) modalIcon.className = "fa-solid fa-stop";
-        if (timeLabel) timeLabel.innerText = "Час закінчення зміни (Київ):";
-        if (submitBtn) submitBtn.innerText = "Підтвердити кінець";
-    }
-
+    document.getElementById('shift-custom-time').value = new Date().toLocaleString('uk-UA', { timeZone: 'Europe/Kyiv', hour: '2-digit', minute: '2-digit', hour12: false });
+    document.getElementById('shift-modal-title').innerText = !isOnShift ? "Відкриття робочої зміни" : "Завершення робочої зміни";
     openModal('shift-modal');
 }
 
-// Відкриття налаштувань профілю
-function openSettingsModal() {
-    document.getElementById('input-username').value = MODERATOR_NAME !== "Новий Модератор" ? MODERATOR_NAME : "";
-    document.getElementById('input-email').value = MODERATOR_EMAIL !== "email@не_вказано" ? MODERATOR_EMAIL : "";
-    document.getElementById('input-role').value = MODERATOR_ROLE;
-    openModal('settings-modal');
-}
-
-// ================= ОБРОБКА ДАТИ ТА ЧАСУ =================
-function getFormattedDate() {
-    const options = { timeZone: 'Europe/Kyiv', day: '2-digit', month: '2-digit', year: 'numeric' };
-    return new Date().toLocaleDateString('uk-UA', options);
-}
-
-function calculateDuration(startTimeStr, endTimeStr) {
-    try {
-        const [startH, startM] = startTimeStr.split(':').map(Number);
-        const [endH, endM] = endTimeStr.split(':').map(Number);
-        
-        let startMinutes = startH * 60 + startM;
-        let endMinutes = endH * 60 + endM;
-        
-        if (endMinutes < startMinutes) endMinutes += 24 * 60; // Перехід через північ
-        
-        const diffMinutes = endMinutes - startMinutes;
-        const hours = Math.floor(diffMinutes / 60);
-        const minutes = diffMinutes % 60;
-        
-        return `${hours} год. ${minutes} хв.`;
-    } catch (e) {
-        return "0 год. 0 хв.";
-    }
-}
-
-// ================= КЕРУВАННЯ СТАНОМ ЗМІНИ =================
 function updateShiftUI(isActive) {
-    const shiftBtn = document.getElementById('shift-btn');
-    const shiftText = document.getElementById('shift-btn-title');
-    const shiftIcon = document.getElementById('shift-icon');
-    const statusDot = document.getElementById('status-dot');
-
-    if (isActive) {
-        if (shiftText) shiftText.innerText = "Завершити зміну";
-        if (shiftIcon) shiftIcon.className = "fa-solid fa-stop";
-        if (statusDot) statusDot.classList.add('active'); 
-        if (shiftBtn) shiftBtn.classList.add('active');
-    } else {
-        if (shiftText) shiftText.innerText = "Почати зміну";
-        if (shiftIcon) shiftIcon.className = "fa-solid fa-play";
-        if (statusDot) statusDot.classList.remove('active'); 
-        if (shiftBtn) shiftBtn.classList.remove('active');
-    }
+    document.getElementById('shift-btn-title').innerText = isActive ? "Завершити зміну" : "Почати зміну";
+    document.getElementById('shift-icon').className = isActive ? "fa-solid fa-stop" : "fa-solid fa-play";
+    document.getElementById('status-dot').classList.toggle('active', isActive);
+    document.getElementById('shift-btn').classList.toggle('active', isActive);
 }
 
-function confirmShiftAction() {
+async function confirmShiftAction() {
     const timeInput = document.getElementById('shift-custom-time').value;
-    const currentDateStr = getFormattedDate();
+    const today = new Date().toLocaleDateString('uk-UA', { timeZone: 'Europe/Kyiv', day: '2-digit', month: '2-digit', year: 'numeric' });
 
     if (!isOnShift) {
         isOnShift = true;
-        shiftStartTimeRaw = timeInput; 
-        localStorage.setItem('ug_current_shift', timeInput); 
+        shiftStartTimeRaw = timeInput;
+        localStorage.setItem(`ug_shift_${currentMod.name}`, timeInput);
         updateShiftUI(true);
     } else {
         isOnShift = false;
-        const durationStr = calculateDuration(shiftStartTimeRaw, timeInput);
-        saveShiftToLocalStorage(currentDateStr, shiftStartTimeRaw, timeInput, durationStr);
-        localStorage.removeItem('ug_current_shift'); 
+        localStorage.removeItem(`ug_shift_${currentMod.name}`);
         updateShiftUI(false);
-    }
 
+        const [sH, sM] = shiftStartTimeRaw.split(':').map(Number);
+        const [eH, eM] = timeInput.split(':').map(Number);
+        let diff = (eH * 60 + eM) - (sH * 60 + sM);
+        if (diff < 0) diff += 24 * 60;
+        const durationStr = `${Math.floor(diff / 60)} год. ${diff % 60} хв.`;
+
+        await db.from('shifts').insert([{
+            moderator_name: currentMod.name, date: today, start_time: shiftStartTimeRaw, end_time: timeInput, duration: durationStr, timestamp: Date.now()
+        }]);
+
+        await loadUserDashboard(currentMod.name);
+    }
     closeModal('shift-modal');
 }
 
-// ================= ЗБЕРЕЖЕННЯ НАЛАШТУВАНЬ =================
-function saveSettings() {
-    const newName = document.getElementById('input-username').value.trim();
-    const newEmail = document.getElementById('input-email').value.trim();
-    const newRole = document.getElementById('input-role').value.trim();
+// ================= ФУНКЦІЇ АДМІНІСТРАТОРА =================
+function openAdminPanel() {
+    const pass = prompt("Введіть пароль Старшого Адміністратора:");
+    if (pass === ADMIN_PASSWORD) {
+        openModal('admin-modal');
+        loadAdminModsList();
+    } else if (pass !== null) {
+        alert("Невірний пароль!");
+    }
+}
 
-    if (newName) { MODERATOR_NAME = newName; localStorage.setItem('ug_mod_name', newName); }
-    if (newEmail) { MODERATOR_EMAIL = newEmail; localStorage.setItem('ug_mod_email', newEmail); }
-    if (newRole) { MODERATOR_ROLE = newRole; localStorage.setItem('ug_mod_role', newRole); }
+async function loadAdminModsList() {
+    const { data, error } = await db.from('moderators').select('*').order('name');
+    const container = document.getElementById('admin-mods-list');
+    if (!error && data) {
+        container.innerHTML = "";
+        data.forEach(mod => {
+            container.innerHTML += `
+                <tr>
+                    <td><b>${mod.name}</b></td>
+                    <td>${mod.reprimands}</td>
+                    <td>${mod.warnings}</td>
+                    <td>${mod.punishments}</td>
+                    <td>${mod.fines}</td>
+                    <td><button onclick="openEditStatModal('${mod.name}')" style="background:#3b82f6; border:none; color:white; padding:4px 8px; border-radius:4px; cursor:pointer;">Редагувати</button></td>
+                </tr>`;
+        });
+    }
+}
 
-    renderProfile();
-    closeModal('settings-modal');
+async function addNewModerator() {
+    const name = document.getElementById('new-mod-name').value.trim();
+    const email = document.getElementById('new-mod-email').value.trim();
+    if (!name) return alert("Введіть хоча б ім'я!");
+
+    await db.from('moderators').insert([{ name, email }]);
+    document.getElementById('new-mod-name').value = "";
+    document.getElementById('new-mod-email').value = "";
+    
+    await loadAdminModsList();
+    await loadProfilesDropdown();
+}
+
+async function openEditStatModal(name) {
+    const { data, error } = await db.from('moderators').select('*').eq('name', name).single();
+    if (!error && data) {
+        document.getElementById('edit-mod-title').innerText = `Редагування: ${data.name}`;
+        document.getElementById('edit-mod-name-hidden').value = data.name;
+        
+        document.getElementById('edit-reprimands').value = data.reprimands;
+        document.getElementById('edit-warnings').value = data.warnings;
+        document.getElementById('edit-punishments').value = data.punishments;
+        document.getElementById('edit-money-warnings').value = data.money_warnings;
+        document.getElementById('edit-support-replies').value = data.support_replies;
+        document.getElementById('edit-bonuses').value = data.bonuses;
+        document.getElementById('edit-fines').value = data.fines;
+        document.getElementById('edit-inactive-days').value = data.inactive_days;
+        document.getElementById('edit-weekly-online').value = data.weekly_online;
+
+        openModal('edit-stat-modal');
+    }
+}
+
+async function submitAdminChanges() {
+    const name = document.getElementById('edit-mod-name-hidden').value;
+    const updates = {
+        reprimands: document.getElementById('edit-reprimands').value,
+        warnings: document.getElementById('edit-warnings').value,
+        punishments: parseInt(document.getElementById('edit-punishments').value) || 0,
+        money_warnings: parseInt(document.getElementById('edit-money-warnings').value) || 0,
+        support_replies: parseInt(document.getElementById('edit-support-replies').value) || 0,
+        bonuses: document.getElementById('edit-bonuses').value,
+        fines: document.getElementById('edit-fines').value,
+        inactive_days: document.getElementById('edit-inactive-days').value,
+        weekly_online: document.getElementById('edit-weekly-online').value,
+    };
+
+    await db.from('moderators').update(updates).eq('name', name);
+    closeModal('edit-stat-modal');
+    await loadAdminModsList();
+    if (currentMod && currentMod.name === name) await loadUserDashboard(name); 
 }
