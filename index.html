@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Панель Модератора | Ukraine GTA</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+    <div class="dashboard">
+        <div class="profile-header">
+            <div class="profile-info">
+                <div class="avatar-container">
+                    <img src="" alt="Avatar" class="avatar">
+                    <div class="status-indicator" id="status-dot"></div>
+                </div>
+                <div class="user-details">
+                    <h2 id="user-name">Завантаження...</h2>
+                    <p class="role" id="user-role">Завантаження...</p>
+                </div>
+            </div>
+            <button class="logout-btn" onclick="alert('Модуль авторизації буде підключено пізніше!')">
+                <i class="fa-solid fa-right-from-bracket"></i> Вийти
+            </button>
+        </div>
+
+        <div class="section-title">Статистика <span class="sub-title">(Локальні дані)</span></div>
+        <div class="stats-grid">
+            <div class="stat-card line-red">
+                <h3>Кількість доган</h3>
+                <div class="stat-value" id="stat-reprimands">0/3</div>
+            </div>
+            <div class="stat-card line-yellow">
+                <h3>Кількість попереджень</h3>
+                <div class="stat-value" id="stat-warnings">0/2</div>
+            </div>
+            <div class="stat-card line-green">
+                <h3>Кількість змін</h3>
+                <div class="stat-value" id="stat-shifts">0</div>
+            </div>
+            <div class="stat-card line-blue">
+                <h3>Кількість покарань</h3>
+                <div class="stat-value" id="stat-punishments">28</div>
+            </div>
+            <div class="stat-card line-purple">
+                <h3>Кількість попереджень з грошима</h3>
+                <div class="stat-value" id="stat-money-warnings">17</div>
+            </div>
+            <div class="stat-card line-pink">
+                <h3>К-сть відповідей у "тех.підтримку"</h3>
+                <div class="stat-value" id="stat-support-replies">117</div>
+            </div>
+            <div class="stat-card line-orange">
+                <h3>Кількість премій</h3>
+                <div class="stat-value" id="stat-bonuses">10%</div>
+            </div>
+            <div class="stat-card line-cyan">
+                <h3>Кількість штрафів</h3>
+                <div class="stat-value" id="stat-fines">0%</div>
+            </div>
+            <div class="stat-card line-teal">
+                <h3>К-сть днів неактивів</h3>
+                <div class="stat-value" id="stat-inactive-days">0 Days</div>
+            </div>
+            <div class="stat-card line-indigo">
+                <h3>Середній онлайн за тиждень</h3>
+                <div class="stat-value" id="stat-weekly-online">0 год. 0 хв.</div>
+            </div>
+        </div>
+
+        <div class="section-title" style="margin-top: 15px;">ОБЕРІТЬ ДІЮ</div>
+        <div class="controls-grid">
+            <button class="control-btn main-action" id="shift-btn" onclick="openShiftModal()">
+                <div class="btn-icon-wrapper blue-icon"><i class="fa-solid fa-play" id="shift-icon"></i></div>
+                <div class="btn-title" id="shift-btn-title">Почати зміну</div>
+                <div class="btn-desc">Зафіксувати початок робочого часу</div>
+            </button>
+            <button class="control-btn" onclick="openModal('history-modal')">
+                <div class="btn-icon-wrapper blue-icon"><i class="fa-solid fa-clock"></i></div>
+                <div class="btn-title">Історія змін</div>
+                <div class="btn-desc">Переглянути попередні зміни</div>
+            </button>
+            <button class="control-btn" onclick="alert('Модуль відпусток у розробці!')">
+                <div class="btn-icon-wrapper blue-icon"><i class="fa-solid fa-umbrella-beach"></i></div>
+                <div class="btn-title">Відпустка/Неактив</div>
+                <div class="btn-desc">Оформити відпустку або неактив</div>
+            </button>
+            <button class="control-btn" onclick="alert('Модуль лідерборду у розробці!')">
+                <div class="btn-icon-wrapper blue-icon"><i class="fa-solid fa-trophy"></i></div>
+                <div class="btn-title">Лідерборд</div>
+                <div class="btn-desc">Рейтинг найактивніших модераторів</div>
+            </button>
+            <button class="control-btn" onclick="openSettingsModal()">
+                <div class="btn-icon-wrapper blue-icon"><i class="fa-solid fa-user-gear"></i></div>
+                <div class="btn-title">Налаштування</div>
+                <div class="btn-desc">Змінити особисті дані</div>
+            </button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="shift-modal" onclick="closeModalOnOverlay(event, 'shift-modal')">
+        <div class="modal-window">
+            <div class="modal-header">
+                <div class="modal-title-wrapper">
+                    <div class="modal-icon-circle"><i class="fa-solid fa-play" id="shift-modal-icon"></i></div>
+                    <h2 id="shift-modal-title">Відкриття робочої зміни</h2>
+                </div>
+                <span class="close-btn" onclick="closeModal('shift-modal')">&times;</span>
+            </div>
+            <div class="form-group">
+                <label id="shift-time-label">Час початку зміни (Київський час):</label>
+                <input type="time" id="shift-custom-time">
+            </div>
+            <button class="action-submit-btn" id="shift-submit-btn" onclick="confirmShiftAction()">Підтвердити старт</button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="history-modal" onclick="closeModalOnOverlay(event, 'history-modal')">
+        <div class="modal-window">
+            <div class="modal-header">
+                <div class="modal-title-wrapper">
+                    <div class="modal-icon-circle"><i class="fa-solid fa-clock"></i></div>
+                    <h2>Історія змін</h2>
+                </div>
+                <span class="close-btn" onclick="closeModal('history-modal')">&times;</span>
+            </div>
+            <div class="history-container">
+                <table class="modal-table">
+                    <thead>
+                        <tr>
+                            <th>ДАТА</th>
+                            <th>ПОЧАТОК</th>
+                            <th>КІНЕЦЬ</th>
+                            <th>ТРИВАЛІСТЬ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-table-body">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="settings-modal" onclick="closeModalOnOverlay(event, 'settings-modal')">
+        <div class="modal-window">
+            <div class="modal-header">
+                <div class="modal-title-wrapper">
+                    <div class="modal-icon-circle"><i class="fa-solid fa-user-gear"></i></div>
+                    <h2>Налаштування профілю</h2>
+                </div>
+                <span class="close-btn" onclick="closeModal('settings-modal')">&times;</span>
+            </div>
+            <div class="form-group">
+                <label>Ім'я (Нікнейм):</label>
+                <input type="text" id="input-username" placeholder="Наприклад: Danil Perets">
+            </div>
+            <div class="form-group">
+                <label>Електронна пошта:</label>
+                <input type="email" id="input-email" placeholder="Введіть ваш email">
+            </div>
+            <div class="form-group">
+                <label>Посада:</label>
+                <input type="text" id="input-role" placeholder="Наприклад: Модератор Discord">
+            </div>
+            <button class="action-submit-btn" onclick="saveSettings()">Зберегти зміни</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
