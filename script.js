@@ -1,7 +1,7 @@
 // ================= НАЛАШТУВАННЯ SUPABASE =================
 const SUPABASE_URL = "https://mntxteqzxwcbquqbnjax.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_rcVqAcRtU8CrZOyuhO6sdA_xySK7sdp"; // <-- Встав ключ сюди!
-const ADMIN_PASSWORD = "1234"; // Пароль для адмінки
+const ADMIN_PASSWORD = "Mnblkjpoi098+"; // Пароль для адмінки
 
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // =========================================================
