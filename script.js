@@ -1,3 +1,10 @@
+// ================= НАЛАШТУВАННЯ SUPABASE =================
+const SUPABASE_URL = "https://mntxteqzxwcbquqbnjax.supabase.co/rest/v1/";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1udHh0ZXF6eHdjYnF1cWJuamF4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MDQ1MTQsImV4cCI6MjA5NzM4MDUxNH0._mht0QadAB4MKgx8c6ZLgd4VMPW0tfZSVJ3Q93XKHjU";
+const ADMIN_PASSWORD = "1234"; // Пароль для входу в адмін-панель
+
+const supabase = Supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// =========================================================
 // ================= НАЛАШТУВАННЯ ДАНИХ ПРОФІЛЮ (ДИНАМІЧНО З БРАУЗЕРА) =================
 let MODERATOR_NAME = localStorage.getItem('ug_mod_name') || "Новий Модератор";
 let MODERATOR_EMAIL = localStorage.getItem('ug_mod_email') || "email@не_вказано";
