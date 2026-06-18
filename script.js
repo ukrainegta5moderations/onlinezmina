@@ -102,7 +102,14 @@ async function loadUserShiftsHistory() {
 
 // КЕРУВАННЯ ВІКНАМИ
 function openModal(id) { document.getElementById(id)?.classList.add('open'); }
-function closeModal(id) { document.getElementById(id)?.classList.remove('open'); }
+function closeModal(id) { 
+    document.getElementById(id)?.classList.remove('open'); 
+    
+    // Якщо закриваємо адмін-панель і ми ще не увійшли в акаунт — повертаємо вікно логіну
+    if (id === 'admin-modal' && !currentMod) {
+        document.getElementById('login-overlay').style.display = 'flex';
+    }
+}
 function closeModalOnOverlay(event, id) { if (event.target.id === id) closeModal(id); }
 
 function openShiftModal() {
@@ -151,13 +158,15 @@ async function confirmShiftAction() {
 function openAdminPanel() {
     const pass = prompt("Введіть пароль Старшого Адміністратора:");
     if (pass === ADMIN_PASSWORD) {
+        // Ховаємо панель входу, щоб вона не перекривала адмінку
+        document.getElementById('login-overlay').style.display = 'none';
+        
         openModal('admin-modal');
         loadAdminModsList();
     } else if (pass !== null) {
         alert("Невірний пароль!");
     }
 }
-
 async function loadAdminModsList() {
     const { data, error } = await db.from('moderators').select('*').order('name');
     const container = document.getElementById('admin-mods-list');
