@@ -1,7 +1,7 @@
 // ================= НАЛАШТУВАННЯ SUPABASE =================
 const SUPABASE_URL = "https://mntxteqzxwcbquqbnjax.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_rcVqAcRtU8CrZOyuhO6sdA_xySK7sdp"; // <-- Встав ключ сюди!
-const ADMIN_PASSWORD = "Mnblkjpoi098+"; // Пароль для адмінки (поки що залишаємо для Кроку 2)
+const ADMIN_PASSWORD = "Mnblkjpoi098+"; // Пароль для адмінки
 
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // =========================================================
@@ -14,7 +14,7 @@ document.addEventListener("DOMContentLoaded", () => {
     checkAuth();
 });
 
-// Перевірка сесії (Замість localStorage використовуємо Supabase Session)
+// Перевірка поточного стану авторизації (сесії)
 async function checkAuth() {
     const { data: { session } } = await db.auth.getSession();
     
@@ -26,7 +26,7 @@ async function checkAuth() {
     }
 }
 
-// Новий вхід через Email + Пароль (Supabase Auth)
+// Стандартний вхід (для тих, хто вже має створений пароль)
 async function loginUser() {
     const email = document.getElementById('login-email').value.trim();
     const password = document.getElementById('login-password').value.trim();
@@ -47,7 +47,43 @@ async function loginUser() {
     loadUserDashboard(data.user.email);
 }
 
-// Вихід з системи (Supabase Auth)
+// Реєстрація (Перший вхід гравця — він сам вигадує пароль)
+async function registerUser() {
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value.trim();
+
+    if (!email || !password) {
+        return alert("Будь ласка, введіть Email та придумайте пароль!");
+    }
+    if (password.length < 6) {
+        return alert("Пароль має містити щонайменше 6 символів!");
+    }
+
+    // 1. Перевіряємо, чи внесено цей Email Головним модератором у таблицю 'moderators'
+    const { data: modData, error: modError } = await db.from('moderators').select('*').eq('email', email).single();
+    
+    if (modError || !modData) {
+        return alert("Помилка: Цей Email не знайдено в базі модераторів! Зверніться до Головного Модератора, щоб він додав вашу пошту.");
+    }
+
+    // 2. Якщо пошта є в білому списку таблиці, створюємо користувача в Auth
+    const { data, error } = await db.auth.signUp({
+        email: email,
+        password: password,
+    });
+
+    if (error) {
+        if (error.message.includes("already registered") || error.status === 422) {
+            return alert("Цей акаунт уже зареєстровано! Просто введіть пароль та натисніть кнопку «Увійти».");
+        }
+        return alert("Помилка створення пароля: " + error.message);
+    }
+
+    alert("Пароль успішно створено! Ви авторизувалися в системі.");
+    loadUserDashboard(email);
+}
+
+// Вихід із системи
 async function logout() {
     const { error } = await db.auth.signOut();
     if (!error) {
@@ -57,7 +93,7 @@ async function logout() {
     }
 }
 
-// Завантаження панелі тепер відбувається за Email
+// Завантаження профілю з бази за Email
 async function loadUserDashboard(email) {
     document.getElementById('login-overlay').style.display = 'none';
     document.getElementById('main-dashboard').style.display = 'block';
@@ -76,7 +112,7 @@ async function loadUserDashboard(email) {
 
 function renderDashboardUI() {
     document.getElementById("user-name").innerText = currentMod.name;
-    document.getElementById("user-role").innerText = `${currentMod.role || 'Модератор'} • ${currentMod.email || 'Немає пошти'}`;
+    document.getElementById("user-role").innerText = `${currentMod.role || 'Модератор'} • ${currentMod.email}`;
     document.querySelector(".avatar").src = `https://ui-avatars.com/api/?name=${encodeURIComponent(currentMod.name)}&background=0D8ABC&color=fff&bold=true`;
 
     document.getElementById("stat-reprimands").innerText = currentMod.reprimands || '0/3';
@@ -117,7 +153,6 @@ async function loadUserShiftsHistory() {
 function openModal(id) { document.getElementById(id)?.classList.add('open'); }
 function closeModal(id) { 
     document.getElementById(id)?.classList.remove('open'); 
-    
     if (id === 'admin-modal' && !currentMod) {
         document.getElementById('login-overlay').style.display = 'flex';
     }
@@ -171,7 +206,6 @@ function openAdminPanel() {
     const pass = prompt("Введіть пароль Старшого Адміністратора:");
     if (pass === ADMIN_PASSWORD) {
         document.getElementById('login-overlay').style.display = 'none';
-        
         openModal('admin-modal');
         loadAdminModsList();
     } else if (pass !== null) {
@@ -188,10 +222,10 @@ async function loadAdminModsList() {
             container.innerHTML += `
                 <tr>
                     <td><b>${mod.name}</b></td>
-                    <td>${mod.reprimands}</td>
-                    <td>${mod.warnings}</td>
-                    <td>${mod.punishments}</td>
-                    <td>${mod.fines}</td>
+                    <td>${mod.reprimands || '0/3'}</td>
+                    <td>${mod.warnings || '0/2'}</td>
+                    <td>${mod.punishments || '0'}</td>
+                    <td>${mod.fines || '0%'}</td>
                     <td><button onclick="openEditStatModal('${mod.email}')" style="background:#3b82f6; border:none; color:white; padding:4px 8px; border-radius:4px; cursor:pointer;">Редагувати</button></td>
                 </tr>`;
         });
@@ -216,15 +250,15 @@ async function openEditStatModal(email) {
         document.getElementById('edit-mod-title').innerText = `Редагування: ${data.name}`;
         document.getElementById('edit-mod-email-hidden').value = data.email;
         
-        document.getElementById('edit-reprimands').value = data.reprimands;
-        document.getElementById('edit-warnings').value = data.warnings;
-        document.getElementById('edit-punishments').value = data.punishments;
-        document.getElementById('edit-money-warnings').value = data.money_warnings;
-        document.getElementById('edit-support-replies').value = data.support_replies;
-        document.getElementById('edit-bonuses').value = data.bonuses;
-        document.getElementById('edit-fines').value = data.fines;
-        document.getElementById('edit-inactive-days').value = data.inactive_days;
-        document.getElementById('edit-weekly-online').value = data.weekly_online;
+        document.getElementById('edit-reprimands').value = data.reprimands || '0/3';
+        document.getElementById('edit-warnings').value = data.warnings || '0/2';
+        document.getElementById('edit-punishments').value = data.punishments || 0;
+        document.getElementById('edit-money-warnings').value = data.money_warnings || 0;
+        document.getElementById('edit-support-replies').value = data.support_replies || 0;
+        document.getElementById('edit-bonuses').value = data.bonuses || '0%';
+        document.getElementById('edit-fines').value = data.fines || '0%';
+        document.getElementById('edit-inactive-days').value = data.inactive_days || '0 Days';
+        document.getElementById('edit-weekly-online').value = data.weekly_online || '0 год.';
 
         openModal('edit-stat-modal');
     }
