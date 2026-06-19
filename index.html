@@ -21,10 +21,13 @@
             
             <div class="form-group">
                 <label>Пароль:</label>
-                <input type="password" id="login-password" placeholder="Введіть пароль">
+                <input type="password" id="login-password" placeholder="Введіть або придумайте пароль">
             </div>
             
-            <button class="action-submit-btn" onclick="loginUser()">Увійти</button>
+            <div style="display: flex; gap: 10px; margin-top: 5px;">
+                <button class="action-submit-btn" onclick="loginUser()" style="flex: 1; margin: 0;">Увійти</button>
+                <button class="action-submit-btn" onclick="registerUser()" style="background: #10b981; flex: 1; margin: 0;">Створити пароль</button>
+            </div>
             <button class="action-submit-btn" style="background: transparent; border: 1px solid #ef4444; color: #ef4444; margin-top: 10px;" onclick="openAdminPanel()">🔐 Адмін-панель</button>
         </div>
     </div>
