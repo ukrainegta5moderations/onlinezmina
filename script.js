@@ -1,7 +1,7 @@
 // ================= НАЛАШТУВАННЯ SUPABASE =================
 const SUPABASE_URL = "https://mntxteqzxwcbquqbnjax.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_rcVqAcRtU8CrZOyuhO6sdA_xySK7sdp"; // <-- Встав ключ сюди!
-const ADMIN_PASSWORD = "Mnblkjpoi098+"; // Пароль для адмінки
+const ADMIN_PASSWORD = "Mnblkjpoi098+"; // Пароль для адмінки (поки що залишаємо для Кроку 2)
 
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // =========================================================
@@ -14,88 +14,80 @@ document.addEventListener("DOMContentLoaded", () => {
     checkAuth();
 });
 
-// Завантаження списку користувачів
-function checkAuth() {
-    const savedUser = localStorage.getItem('active_ug_user');
-    if (savedUser) {
-        loadUserDashboard(savedUser);
+// Перевірка сесії (Замість localStorage використовуємо Supabase Session)
+async function checkAuth() {
+    const { data: { session } } = await db.auth.getSession();
+    
+    if (session) {
+        loadUserDashboard(session.user.email);
     } else {
         document.getElementById('login-overlay').style.display = 'flex';
         document.getElementById('main-dashboard').style.display = 'none';
     }
 }
 
+// Новий вхід через Email + Пароль (Supabase Auth)
 async function loginUser() {
-    const username = document.getElementById('login-username').value.trim();
+    const email = document.getElementById('login-email').value.trim();
     const password = document.getElementById('login-password').value.trim();
 
-    if (!username || !password) {
-        return alert("Будь ласка, введіть нікнейм та пароль!");
+    if (!email || !password) {
+        return alert("Будь ласка, введіть Email та пароль!");
     }
 
-    // Шукаємо модератора в базі за нікнеймом
-    const { data, error } = await db.from('moderators').select('*').eq('name', username).single();
+    const { data, error } = await db.auth.signInWithPassword({
+        email: email,
+        password: password,
+    });
 
-    if (error || !data) {
-        return alert("Такого модератора не знайдено! Перевірте правильність вводу або зверніться до Адміністратора.");
+    if (error) {
+        return alert("Помилка входу: Невірний Email або пароль!");
     }
 
-    // Якщо пароль ще не встановлено (це перший вхід модератора)
-    if (!data.password) {
-        const confirmMsg = confirm(`Це ваш перший вхід. Встановити введений пароль як ваш постійний?`);
-        if (confirmMsg) {
-            // Зберігаємо пароль у базу
-            await db.from('moderators').update({ password: password }).eq('name', username);
-            alert("Пароль успішно створено! Ви увійшли в систему.");
-            
-            // Зберігаємо сесію і пускаємо в панель
-            localStorage.setItem('active_ug_user', username);
-            loadUserDashboard(username);
-        }
-        return;
-    }
-
-    // Якщо пароль вже встановлено раніше, перевіряємо його
-    if (data.password !== password) {
-        return alert("Невірний пароль!");
-    }
-
-    // Якщо пароль правильний — пускаємо в панель
-    localStorage.setItem('active_ug_user', username);
-    loadUserDashboard(username);
+    loadUserDashboard(data.user.email);
 }
 
-function logout() {
-    localStorage.removeItem('active_ug_user');
-    location.reload();
+// Вихід з системи (Supabase Auth)
+async function logout() {
+    const { error } = await db.auth.signOut();
+    if (!error) {
+        location.reload();
+    } else {
+        alert("Сталася помилка при виході!");
+    }
 }
 
-async function loadUserDashboard(name) {
+// Завантаження панелі тепер відбувається за Email
+async function loadUserDashboard(email) {
     document.getElementById('login-overlay').style.display = 'none';
     document.getElementById('main-dashboard').style.display = 'block';
 
-    const { data, error } = await db.from('moderators').select('*').eq('name', name).single();
-    if (!error && data) {
-        currentMod = data;
-        renderDashboardUI();
-        loadUserShiftsHistory();
+    const { data, error } = await db.from('moderators').select('*').eq('email', email).single();
+    
+    if (error || !data) {
+        alert("Профіль не знайдено в базі модераторів! Зверніться до адміністратора.");
+        return;
     }
+    
+    currentMod = data;
+    renderDashboardUI();
+    loadUserShiftsHistory();
 }
 
 function renderDashboardUI() {
     document.getElementById("user-name").innerText = currentMod.name;
-    document.getElementById("user-role").innerText = `${currentMod.role} • ${currentMod.email || 'Немає пошти'}`;
+    document.getElementById("user-role").innerText = `${currentMod.role || 'Модератор'} • ${currentMod.email || 'Немає пошти'}`;
     document.querySelector(".avatar").src = `https://ui-avatars.com/api/?name=${encodeURIComponent(currentMod.name)}&background=0D8ABC&color=fff&bold=true`;
 
-    document.getElementById("stat-reprimands").innerText = currentMod.reprimands;
-    document.getElementById("stat-warnings").innerText = currentMod.warnings;
-    document.getElementById("stat-punishments").innerText = currentMod.punishments;
-    document.getElementById("stat-money-warnings").innerText = currentMod.money_warnings;
-    document.getElementById("stat-support-replies").innerText = currentMod.support_replies;
-    document.getElementById("stat-bonuses").innerText = currentMod.bonuses;
-    document.getElementById("stat-fines").innerText = currentMod.fines;
-    document.getElementById("stat-inactive-days").innerText = currentMod.inactive_days;
-    document.getElementById("stat-weekly-online").innerText = currentMod.weekly_online;
+    document.getElementById("stat-reprimands").innerText = currentMod.reprimands || '0/3';
+    document.getElementById("stat-warnings").innerText = currentMod.warnings || '0/2';
+    document.getElementById("stat-punishments").innerText = currentMod.punishments || '0';
+    document.getElementById("stat-money-warnings").innerText = currentMod.money_warnings || '0';
+    document.getElementById("stat-support-replies").innerText = currentMod.support_replies || '0';
+    document.getElementById("stat-bonuses").innerText = currentMod.bonuses || '0%';
+    document.getElementById("stat-fines").innerText = currentMod.fines || '0%';
+    document.getElementById("stat-inactive-days").innerText = currentMod.inactive_days || '0 Days';
+    document.getElementById("stat-weekly-online").innerText = currentMod.weekly_online || '0 год.';
 
     const savedShiftState = localStorage.getItem(`ug_shift_${currentMod.name}`);
     if (savedShiftState) {
@@ -126,7 +118,6 @@ function openModal(id) { document.getElementById(id)?.classList.add('open'); }
 function closeModal(id) { 
     document.getElementById(id)?.classList.remove('open'); 
     
-    // Якщо закриваємо адмін-панель і ми ще не увійшли в акаунт — повертаємо вікно логіну
     if (id === 'admin-modal' && !currentMod) {
         document.getElementById('login-overlay').style.display = 'flex';
     }
@@ -170,7 +161,7 @@ async function confirmShiftAction() {
             moderator_name: currentMod.name, date: today, start_time: shiftStartTimeRaw, end_time: timeInput, duration: durationStr, timestamp: Date.now()
         }]);
 
-        await loadUserDashboard(currentMod.name);
+        await loadUserDashboard(currentMod.email);
     }
     closeModal('shift-modal');
 }
@@ -179,7 +170,6 @@ async function confirmShiftAction() {
 function openAdminPanel() {
     const pass = prompt("Введіть пароль Старшого Адміністратора:");
     if (pass === ADMIN_PASSWORD) {
-        // Ховаємо панель входу, щоб вона не перекривала адмінку
         document.getElementById('login-overlay').style.display = 'none';
         
         openModal('admin-modal');
@@ -188,6 +178,7 @@ function openAdminPanel() {
         alert("Невірний пароль!");
     }
 }
+
 async function loadAdminModsList() {
     const { data, error } = await db.from('moderators').select('*').order('name');
     const container = document.getElementById('admin-mods-list');
@@ -201,7 +192,7 @@ async function loadAdminModsList() {
                     <td>${mod.warnings}</td>
                     <td>${mod.punishments}</td>
                     <td>${mod.fines}</td>
-                    <td><button onclick="openEditStatModal('${mod.name}')" style="background:#3b82f6; border:none; color:white; padding:4px 8px; border-radius:4px; cursor:pointer;">Редагувати</button></td>
+                    <td><button onclick="openEditStatModal('${mod.email}')" style="background:#3b82f6; border:none; color:white; padding:4px 8px; border-radius:4px; cursor:pointer;">Редагувати</button></td>
                 </tr>`;
         });
     }
@@ -210,7 +201,7 @@ async function loadAdminModsList() {
 async function addNewModerator() {
     const name = document.getElementById('new-mod-name').value.trim();
     const email = document.getElementById('new-mod-email').value.trim();
-    if (!name) return alert("Введіть хоча б ім'я!");
+    if (!name || !email) return alert("Введіть ім'я та Email!");
 
     await db.from('moderators').insert([{ name, email }]);
     document.getElementById('new-mod-name').value = "";
@@ -219,11 +210,11 @@ async function addNewModerator() {
     await loadAdminModsList();
 }
 
-async function openEditStatModal(name) {
-    const { data, error } = await db.from('moderators').select('*').eq('name', name).single();
+async function openEditStatModal(email) {
+    const { data, error } = await db.from('moderators').select('*').eq('email', email).single();
     if (!error && data) {
         document.getElementById('edit-mod-title').innerText = `Редагування: ${data.name}`;
-        document.getElementById('edit-mod-name-hidden').value = data.name;
+        document.getElementById('edit-mod-email-hidden').value = data.email;
         
         document.getElementById('edit-reprimands').value = data.reprimands;
         document.getElementById('edit-warnings').value = data.warnings;
@@ -240,7 +231,7 @@ async function openEditStatModal(name) {
 }
 
 async function submitAdminChanges() {
-    const name = document.getElementById('edit-mod-name-hidden').value;
+    const email = document.getElementById('edit-mod-email-hidden').value;
     const updates = {
         reprimands: document.getElementById('edit-reprimands').value,
         warnings: document.getElementById('edit-warnings').value,
@@ -253,8 +244,8 @@ async function submitAdminChanges() {
         weekly_online: document.getElementById('edit-weekly-online').value,
     };
 
-    await db.from('moderators').update(updates).eq('name', name);
+    await db.from('moderators').update(updates).eq('email', email);
     closeModal('edit-stat-modal');
     await loadAdminModsList();
-    if (currentMod && currentMod.name === name) await loadUserDashboard(name); 
+    if (currentMod && currentMod.email === email) await loadUserDashboard(email); 
 }
